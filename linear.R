@@ -1,4 +1,4 @@
-## Predict wins in NCAA tournament
+## Predict wins in NCAA tournament with GLMNET
 
 library(dplyr)
 library(ggplot2)
@@ -41,7 +41,7 @@ the_split <- initial_split(data = df_clean, prop = 0.8, strata='Tourney_Round')
 train <- training(the_split)
 test <- testing(the_split)
 
-TR_recipe <- recipe(Tourney_Round ~ . , data = train) %>% 
+linear_recipe <- recipe(Tourney_Round ~ . , data = train) %>% 
   step_rm(TEAM, G, W, POSTSEASON, YEAR) %>%
   step_log(Tourney_Round) %>% 
   step_zv(all_predictors()) %>%  
@@ -50,50 +50,50 @@ TR_recipe <- recipe(Tourney_Round ~ . , data = train) %>%
   step_other(all_nominal()) %>% 
   step_dummy(all_nominal(), one_hot=TRUE)
 
-TR_recipe
+linear_recipe
 
-TR_prepped <- TR_recipe %>% prep(data=train)
-TR_prepped
+linear_prepped <- linear_recipe %>% prep(data=train)
+linear_prepped
 
-TR_prepped %>% bake(new_data=train)
+linear_prepped %>% bake(new_data=train)
 
-train_x <- TR_prepped %>% bake(all_predictors(), new_data=train, composition='matrix')
+train_x <- linear_prepped %>% bake(all_predictors(), new_data=train, composition='matrix')
 head(train_x)
-train_y <- TR_prepped %>% bake(all_outcomes(), new_data=train, composition='matrix')
+train_y <- linear_prepped %>% bake(all_outcomes(), new_data=train, composition='matrix')
 
-TR_model_1 <- glmnet(x=train_x, y=train_y, family='gaussian', standardize = FALSE)
+linear_model_1 <- glmnet(x=train_x, y=train_y, family='gaussian', standardize = FALSE)
 
-plot(TR_model_1, xvar = 'lambda')
+plot(linear_model_1, xvar = 'lambda')
 
 ## Show interactive plot
-coefpath(TR_model_1)
-coefplot(TR_model_1, sort='magnitude')   
+coefpath(linear_model_1)
 
-TR_model_2 <- cv.glmnet(x=train_x, y=train_y, family='gaussian', standardize=FALSE, nfolds=5)
-plot(TR_model_2)
-TR_model_2$lambda
-coefpath(TR_model_2)
-TR_model_2$lambda.min
-TR_model_2$lambda.1se
+linear_model_2 <- cv.glmnet(x=train_x, y=train_y, family='gaussian', standardize=FALSE, nfolds=5)
+plot(linear_model_2)
+linear_model_2$lambda
+coefpath(linear_model_2)
+linear_model_2$lambda.min
+linear_model_2$lambda.1se
 
-coefplot(TR_model_2, sort='magnitude', lambda='lambda.1se', intercept = FALSE, plot=FALSE)
+coefplot(linear_model_2, sort='magnitude', lambda='lambda.1se', intercept = FALSE, plot=FALSE)
 
-TR_model_3 <- cv.glmnet(x=train_x, y=train_y, family='gaussian', nfolds=5, standardize=FALSE, alpha=0)
-coefpath(TR_model_3)
-TR_model_4 <- cv.glmnet(x=train_x, y=train_y, family='gaussian', nfolds=5, standardize=FALSE, alpha=0.7)
-coefpath(TR_model_4)
+linear_model_3 <- cv.glmnet(x=train_x, y=train_y, family='gaussian', nfolds=5, standardize=FALSE, alpha=0)
+coefpath(linear_model_3)
+linear_model_4 <- cv.glmnet(x=train_x, y=train_y, family='gaussian', nfolds=5, standardize=FALSE, alpha=0.7)
+coefpath(linear_model_4)
 ## note:  lasso (alpha = 1.0) better for model interpretation
 
-test_x <- TR_prepped %>%  bake(all_predictors(), new_data=test, composition='matrix')
-test_y <- TR_prepped %>%  bake(all_outcomes(), new_data=test, composition='matrix')
+test_x <- linear_prepped %>%  bake(all_predictors(), new_data=test, composition='matrix')
+test_y <- linear_prepped %>%  bake(all_outcomes(), new_data=test, composition='matrix')
 
-TR_preds <- predict(TR_model_4, newx=test_x, s='lambda.1se')
-head(exp(TR_preds))
+linear_preds <- predict(linear_model_4, newx=test_x, s='lambda.1se')
+head(exp(linear_preds))
 
-test %>% mutate(Predicted_Round=as.vector(exp(TR_preds))) %>% select(TEAM, Tourney_Round, Predicted_Round)
+test %>% mutate(Predicted_Round=as.vector(exp(linear_preds))) %>% select(TEAM, Tourney_Round, Predicted_Round)
 
 ## RMSE:
-sqrt(mean((test_y - TR_preds)^2))
+sqrt(mean((test_y - linear_preds)^2))
 ## MAE:
-mean(abs(test_y - TR_preds))
+mean(abs(test_y - linear_preds))
+
 
